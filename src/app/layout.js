@@ -1,11 +1,13 @@
 import './globals.css';
 import { Inter } from 'next/font/google';
+import { siteUrl } from './site-url';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'The 11th Mile | Elite Training',
-  description: 'Performance Laboratory // England',
+  metadataBase: new URL(siteUrl),
+  title: 'Running Workouts & 5K Pace Calculator | The 11th Mile',
+  description: 'Explore running sessions and use the 5K pace calculator to find training paces for your next workout.',
 };
 
 export default function RootLayout({ children }) {

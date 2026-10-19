@@ -16,7 +16,7 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--text-dark); margin: 0; line-height: 1.5; overscroll-behavior: none; }
-.feature-hidden { display: none !important; }
+.feature-hidden, .plan-btn-mobile-fix.feature-hidden { display: none !important; }
 
 /* --- HEADER --- */
 header {
@@ -51,6 +51,10 @@ label { display: block; font-size: 0.75rem; text-transform: uppercase; opacity: 
 .res-label { font-size: 0.75rem; opacity: 0.7; text-transform: uppercase; color:white; }
 .res-val { font-size: 1.1rem; font-weight: 900; color: var(--accent); text-align: right; }
 .tier-badge { background: rgba(255,255,255,0.1); color: white; text-align: center; padding: 8px; border-radius: 6px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem; margin-bottom: 20px; }
+.tier-badge.tier-beginner { background: #636e72; color: white; }
+.tier-badge.tier-intermediate { background: #2980b9; color: white; }
+.tier-badge.tier-advanced { background: #16a085; color: white; }
+.tier-badge.tier-elite { background: #f1c40f; color: #2d3436; }
 
 /* --- FILTERS & SORT --- */
 .filter-area { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 30px; align-items: center; justify-content: space-between; }

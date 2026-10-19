@@ -778,8 +778,8 @@ export default function The11thMile() {
                         
                         {paces && (
                             <div className="results-box" style={{ display: 'block' }}>
-                                <div className="tier-badge">{paces.level}</div>
-                                <div className="res-row"><span className="res-label" style={{color:'var(--accent)'}}>Warm Up / Cool Down</span><span className="res-val">{formatTime(paces.warmup)}{unit==='miles'?' /mi':' /km'}</span></div>
+                                <div className={`tier-badge tier-${paces.level.toLowerCase()}`}>{paces.level}</div>
+                                <div className="res-row"><span className="res-label">Warm Up / Cool Down</span><span className="res-val">{formatTime(paces.warmup)}{unit==='miles'?' /mi':' /km'}</span></div>
                                 <div className="res-row"><span className="res-label">Easy Run</span><span className="res-val">Max {formatTime(paces.easy)}{unit==='miles'?' /mi':' /km'}</span></div>
                                 <div className="res-row"><span className="res-label">Long Run</span><span className="res-val">Conversation Pace</span></div>
                                 <div className="res-row"><span className="res-label">Tempo</span><span className="res-val">{formatTime(paces.tempo)}{unit==='miles'?' /mi':' /km'}</span></div>

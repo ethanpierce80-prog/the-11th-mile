@@ -248,6 +248,20 @@ export default function The11thMile() {
     const [infoModalSession, setInfoModalSession] = useState(null);
     const [isPlanSetupOpen, setIsPlanSetupOpen] = useState(false);
 
+    useEffect(() => {
+        if (!infoModalSession && !isPlanSetupOpen) return;
+
+        const originalBodyOverflow = document.body.style.overflow;
+        const originalDocumentOverflow = document.documentElement.style.overflow;
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+
+        return () => {
+            document.body.style.overflow = originalBodyOverflow;
+            document.documentElement.style.overflow = originalDocumentOverflow;
+        };
+    }, [infoModalSession, isPlanSetupOpen]);
+
     // Form state 
     const [form, setForm] = useState({
         name: '', age: '', yearsRunning: '', goalType: 'race',
@@ -722,7 +736,7 @@ export default function The11thMile() {
 
                 <div className="dashboard">
                     <div className="sidebar">
-                        <div className="input-group" style={{ textAlign: 'center', marginBottom: '30px', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
+                        <div className={`input-group${user ? '' : ' feature-hidden'}`} style={{ textAlign: 'center', marginBottom: '30px', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
                             {user ? (
                                 <div>
                                     <p style={{ fontSize: '0.85rem', marginBottom: '10px', fontWeight: 'bold' }}>
@@ -737,7 +751,7 @@ export default function The11thMile() {
                                     <p style={{ fontSize: '0.8rem', marginBottom: '10px', color: 'rgba(255,255,255,0.8)' }}>
                                         Save your progress & plans securely.
                                     </p>
-                                    <button className="action-btn" onClick={logInWithGoogle} style={{ background: 'white', color: 'var(--primary)', marginTop: '0' }}>
+                                    <button className="action-btn feature-hidden" onClick={logInWithGoogle} style={{ background: 'white', color: 'var(--primary)', marginTop: '0' }}>
                                         Log In with Google
                                     </button>
                                 </div>
@@ -773,10 +787,10 @@ export default function The11thMile() {
                                 <div className="res-row"><span className="res-label">Intervals</span><span className="res-val">{formatTime(paces.interval)}{unit==='miles'?' /mi':' /km'}</span></div>
                             </div>
                         )}
-                        <button className="action-btn plan-btn" onClick={() => setIsPlanSetupOpen(true)}>Create Training Plan</button>
+                        <button className="action-btn plan-btn feature-hidden" onClick={() => setIsPlanSetupOpen(true)}>Create Training Plan</button>
                     </div>
 
-                    <button className="action-btn plan-btn plan-btn-mobile-fix" onClick={() => setIsPlanSetupOpen(true)} style={{display:'none'}}>Create Training Plan</button>
+                    <button className="action-btn plan-btn plan-btn-mobile-fix feature-hidden" onClick={() => setIsPlanSetupOpen(true)} style={{display:'none'}}>Create Training Plan</button>
 
                     <div className="main-content">
                         <div className="view-toggle-nav">

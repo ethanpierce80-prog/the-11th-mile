@@ -101,10 +101,10 @@ export const sessions = [
       breakdown: "10 minute warmup / 200m @ [INTERVAL] / 60s recovery / 400m @ [INTERVAL] / 60s recovery / 800m @ [INTERVAL] / 90s recovery / 1200m @ [INTERVAL] / 90s recovery / 1600m @ [INTERVAL] / 90s recovery / 1200m @ [INTERVAL] / 90s recovery / 800m @ [INTERVAL] / 90s recovery / 400m @ [INTERVAL] / 60s recovery / 200m @ [INTERVAL] / 10 minute cool down.",
       pacesList: ["2x 200m at [INTERVAL]", "2x 400m at [INTERVAL]", "2x 800m at [INTERVAL]", "2x 1200m at [INTERVAL]", "1600m at [INTERVAL]"] },
 
-    { id: 44, title: "Mile Up & Overs", category: "Interval", bgClass: "grad-red", diffColor: "#c0392b", difficulty: "Very Hard", distanceVal: 5, summary: "Segmented miles.",
-      sessionDetail: "4x 1 Mile (Changing speeds)", recoveryDetail: "3 minutes between miles.",
-      breakdown: "10 minute warmup / 4x (1 Mile alternating 400m @ [INTERVAL] and 400m @ [FLOAT]) / 3 minute recovery between miles / 10 minute cool down.",
-      pacesList: ["4x 1 Mile alternating [INTERVAL] and [FLOAT]"] },
+    { id: 44, title: "1600m and Track Repeats", category: "Interval", bgClass: "grad-red", diffColor: "#c0392b", difficulty: "Very Hard", distanceVal: 5, summary: "Track reps at progressively faster race paces.",
+      sessionDetail: "1.6km / 1km / 2x 800m / 3x 600m / 4x 400m", recoveryDetail: "90 seconds between reps | 120 seconds between sets.",
+      breakdown: "10 minute warmup / 1.6km @ [PACE_10K] / 120s recovery / 1km @ [PACE_5K] / 120s recovery / 2x 800m @ [PACE_5K] (90s recovery between reps) / 120s recovery / 3x 600m @ [PACE_3K] (90s recovery between reps) / 120s recovery / 4x 400m @ [PACE_1500M] (90s recovery between reps) / 10 minute cool down.",
+      pacesList: ["1.6km at [PACE_10K]", "1km at [PACE_5K]", "2x 800m at [PACE_5K]", "3x 600m at [PACE_3K]", "4x 400m at [PACE_1500M]"] },
 
     // --- FARTLEK SESSIONS ---
     { id: 4, title: "3-5-1 Threshold Ladder", category: "Fartlek", bgClass: "grad-grey", diffColor: "#7f8fa6", difficulty: "Hard", distanceVal: 10, summary: "Time-based intervals.",
@@ -272,6 +272,92 @@ export const slugify = (value) => value
 
 export const getCategoryForSession = (session) =>
     sessionCategories.find((category) => category.category === session.category);
+
+export const getSessionDisplayTitle = (session) =>
+    session.category === 'Interval' || session.category === 'Fartlek'
+        ? session.sessionDetail || session.title
+        : session.title;
+
+export const getReducedIntervalWorkout = (session, displayUnit = 'km') => {
+    if (session.category !== 'Interval') return null;
+
+    if (session.id === 15) {
+        return {
+            breakdown: session.breakdown
+                .replace(/\b(?:800|400)m\b/g, '400m')
+                .replace(/\s*@\s*\[TEMPO\]/gi, ''),
+            sessionDetail: '8x 400m / 8x 400m',
+            pacesList: session.pacesList.map((pace) =>
+                pace.replace(/\b(?:800|400)m\b/g, '400m').replace(/\s+at\s+\[TEMPO\]/gi, '')
+            ),
+            hasReps: true
+        };
+    }
+
+    const formatReducedDistance = (meters) => {
+        const roundedMeters = Math.round(meters / 10) * 10;
+        if (displayUnit === 'miles') {
+            const miles = roundedMeters / 1609.34;
+            if (Number.isInteger(miles)) {
+                return `${miles} ${miles === 1 ? 'Mile' : 'Miles'}`;
+            }
+            return `${miles.toFixed(2)} Miles`;
+        }
+        return roundedMeters >= 1000
+            ? `${(roundedMeters / 1000).toFixed(1).replace(/\.0$/, '')}km`
+            : `${roundedMeters}m`;
+    };
+
+    const reduceSegments = (text) => {
+        if (/\[(?:TEMPO|PACE_10K)\]/i.test(text)) return null;
+
+        let hasDistance = false;
+        let hasRepLongerThanReduction = false;
+        const reducedText = text.replace(/(?<![A-Z0-9_])(\d+(?:\.\d+)?)\s*(km|kilometers?|miles?|mi|m)\b/gi, (match, amount, unit) => {
+            hasDistance = true;
+            const value = Number(amount);
+            const normalizedUnit = unit.toLowerCase();
+            const meters = normalizedUnit === 'km' || normalizedUnit.startsWith('kilometer')
+                ? value * 1000
+                : normalizedUnit === 'm' ? value : value * 1609.34;
+
+            if (meters <= 200) return '';
+
+            const roundedMeters = Math.round((meters - 200) / 10) * 10;
+            if (roundedMeters <= 0) return '';
+
+            hasRepLongerThanReduction = true;
+            return formatReducedDistance(roundedMeters);
+        });
+
+        if (hasDistance && !hasRepLongerThanReduction) return null;
+        return reducedText.replace(/\s{2,}/g, ' ').trim();
+    };
+
+    const breakdown = session.breakdown
+        .split('/')
+        .map((segment) => reduceSegments(segment.trim()))
+        .filter(Boolean)
+        .join(' / ');
+    const sessionDetail = session.breakdown
+        .split('/')
+        .map((segment) => segment.trim())
+        .filter((segment) => /\d+(?:\.\d+)?\s*(?:km|kilometers?|miles?|mi|m)\b/i.test(segment) && !/\[(?:TEMPO|PACE_10K)\]/i.test(segment))
+        .map(reduceSegments)
+        .filter(Boolean)
+        .map((segment) => segment.replace(/\s*@\s*\[[A-Z0-9_]+\]/gi, '').replace(/\s*\([^)]*recovery[^)]*\)/gi, '').trim())
+        .join(' / ');
+    const pacesList = session.pacesList
+        .map(reduceSegments)
+        .filter(Boolean);
+
+    return {
+        breakdown,
+        sessionDetail,
+        pacesList,
+        hasReps: Boolean(sessionDetail)
+    };
+};
 
 export const getSessionUrl = (session) => {
     const category = getCategoryForSession(session);

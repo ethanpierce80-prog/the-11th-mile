@@ -2,10 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { getSessionUrl, matchesSessionSearch } from './session-data';
+import { getSessionUrl, getSessionDisplayTitle, matchesSessionSearch } from './session-data';
+import { useDistanceUnit } from './distance-unit';
+import { formatDistanceText } from './distance-format';
 
 export default function WorkoutSearchList({ sessions, showType = false }) {
     const [search, setSearch] = useState('');
+    const unit = useDistanceUnit();
     const filteredSessions = sessions.filter((session) => matchesSessionSearch(session, search));
 
     return (
@@ -23,10 +26,10 @@ export default function WorkoutSearchList({ sessions, showType = false }) {
                 {filteredSessions.map((session) => (
                     <Link className="workout-list-item" href={getSessionUrl(session)} key={session.id}>
                         <span>
-                            <strong>{session.title}</strong>
-                            <span>{showType ? `${session.category} · ` : ''}{session.summary}</span>
+                            <strong>{formatDistanceText(getSessionDisplayTitle(session), unit)}</strong>
+                            <span>{showType ? `${session.category} · ` : ''}{formatDistanceText(session.summary, unit)}</span>
                         </span>
-                        <span className="workout-distance">{session.distanceVal} miles</span>
+                        <span className="workout-distance">{formatDistanceText(`${session.distanceVal} Miles`, unit)}</span>
                     </Link>
                 ))}
                 {filteredSessions.length === 0 && (

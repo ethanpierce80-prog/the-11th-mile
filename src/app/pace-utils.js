@@ -17,6 +17,11 @@ export const calculatePaces = (time, unit, gender) => {
 
     const averagePace = unit === 'miles' ? totalSeconds / 3.10686 : totalSeconds / 5;
     const conversion = unit === 'miles' ? 1 : 0.621371;
+    const racePace = (distanceKm) => {
+        const predictedTime = totalSeconds * ((distanceKm / 5) ** 1.06);
+        const pacePerKm = predictedTime / distanceKm;
+        return unit === 'miles' ? pacePerKm * 1.60934 : pacePerKm;
+    };
     const minutes = totalSeconds / 60;
     const level = gender === 'male'
         ? (minutes < 16 ? 'Elite' : minutes < 20 ? 'Advanced' : minutes < 25 ? 'Intermediate' : 'Beginner')
@@ -29,6 +34,10 @@ export const calculatePaces = (time, unit, gender) => {
         float: averagePace + (70 * conversion),
         long: averagePace + (105 * conversion),
         easy: averagePace + (95 * conversion),
+        race10k: racePace(10),
+        race5k: racePace(5),
+        race3k: racePace(3),
+        race1500: racePace(1.5),
         warmup: averagePace + (135 * conversion),
         level
     };

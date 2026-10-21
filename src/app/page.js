@@ -5,8 +5,10 @@ import './globals.css';
 import { auth, db, logInWithGoogle, logOut } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { sessions, sessionTypes, getSessionUrl, matchesSessionSearch } from './session-data';
+import { sessions, sessionTypes, getSessionUrl, getSessionDisplayTitle, getReducedIntervalWorkout, matchesSessionSearch } from './session-data';
 import { calculatePaces, formatTime } from './pace-utils';
+import { formatDistanceText } from './distance-format';
+import { saveDistanceUnit } from './distance-unit';
 import SiteHeader from './site-header';
 import Link from 'next/link';
 
@@ -16,6 +18,7 @@ export default function The11thMile() {
     const [gender, setGender] = useState('male');
     const [activeFilter, setActiveFilter] = useState('all');
     const [sessionSearch, setSessionSearch] = useState('');
+    const [isReducedSession, setIsReducedSession] = useState(false);
     const [sortMode, setSortMode] = useState(0);
     const [view, setView] = useState('library');
     const [plan, setPlan] = useState(null);
@@ -54,15 +57,7 @@ export default function The11thMile() {
 
     // Helpers
     const formatTextForUnit = (text) => {
-        if (!text) return text;
-        if (unit === 'miles') return text;
-        return text.replace(/(\d+(\.\d+)?)\s*Miles?/gi, (match, p1) => {
-            const miles = parseFloat(p1);
-            if (miles === 0.25) return "400m";
-            if (miles === 0.5 || miles === 0.50) return "800m";
-            const km = (miles * 1.60934).toFixed(1).replace(/\.0$/, ''); 
-            return `${km}km`;
-        });
+        return formatDistanceText(text, unit);
     };
 
     // DB Sync Helper
@@ -147,6 +142,10 @@ export default function The11thMile() {
         if (val.length > 4) val = val.slice(0, 4); 
         if (val.length > 2) val = val.slice(0, 2) + ':' + val.slice(2); 
         setTimeInput(val);
+    };
+
+    const openSession = (session) => {
+        setInfoModalSession(session);
     };
 
     const handleGoalTimeInput = (e) => {
@@ -444,7 +443,7 @@ export default function The11thMile() {
                     
                     dayNodes.push(
                         <div key={d} className={`day-cell ${isDone ? 'completed' : ''}`}>
-                            <div onClick={() => setInfoModalSession(sess)}>
+                            <div onClick={() => openSession(sess)}>
                                 <div className="day-name">{dayName}</div>
                                 <div className="day-date">{currentDate.getDate()} {currentDate.toLocaleString('default',{month:'short'})}</div>
                                 <div className={`day-type type-${sess.category}`}>{sess.category}</div>
@@ -529,7 +528,11 @@ export default function The11thMile() {
                         </div>
                         <div className="input-group">
                             <label>Units</label>
-                            <button className="action-btn" onClick={() => setUnit(unit === 'miles' ? 'km' : 'miles')}>
+                            <button className="action-btn" onClick={() => {
+                                const nextUnit = unit === 'miles' ? 'km' : 'miles';
+                                setUnit(nextUnit);
+                                saveDistanceUnit(nextUnit);
+                            }}>
                                 Switch to {unit === 'miles' ? 'KM' : 'Miles'}
                             </button>
                         </div>
@@ -580,15 +583,30 @@ export default function The11thMile() {
                                     onChange={(event) => setSessionSearch(event.target.value)}
                                     placeholder="Search by name, distance, or type"
                                 />
+                                {(activeFilter === 'all' || activeFilter === 'Interval') && (
+                                    <div className="reduced-session-controls library-reduced-controls">
+                                        <button className="action-btn reduce-session-btn" onClick={() => setIsReducedSession((isReduced) => !isReduced)}>
+                                            {isReducedSession ? 'Show Original Sessions' : 'Reduce Interval Sessions'}
+                                        </button>
+                                        <p className="reduced-session-note">
+                                            Reduces Interval sessions only: removes tempo efforts, takes 200m off each remaining rep, removes reps of 200m or less, and leaves recovery unchanged.
+                                        </p>
+                                    </div>
+                                )}
                                 <div className="session-grid">
                                     {sessions
                                         .filter(s => (activeFilter === 'all' || s.category === activeFilter) && matchesSessionSearch(s, sessionSearch))
                                         .sort((a,b) => sortMode === 1 ? a.distanceVal - b.distanceVal : sortMode === 2 ? b.distanceVal - a.distanceVal : 0)
                                         .map(session => {
                                             let diffClass = "difficulty " + (session.difficulty.includes("Hard") || session.difficulty.includes("Max") ? "diff-hard" : session.difficulty.includes("Medium") || session.difficulty.includes("Moderate") ? "diff-med" : "diff-easy");
+                                            const reducedWorkout = isReducedSession ? getReducedIntervalWorkout(session, unit) : null;
+                                            const displayedSession = reducedWorkout ? { ...session, ...reducedWorkout } : session;
+                                            const cardTitle = isReducedSession && reducedWorkout && !reducedWorkout.hasReps
+                                                ? 'No reps remain after removing tempo efforts'
+                                                : getSessionDisplayTitle(displayedSession);
                                             return (
-                                                <div key={session.id} className="session-card" onClick={() => setInfoModalSession(session)}>
-                                                    <div className={`card-header ${session.bgClass}`}><span className="tag">{session.category}</span><h3 className="card-title">{formatTextForUnit(session.title)}</h3></div>
+                                                <div key={session.id} className="session-card" onClick={() => openSession(session)}>
+                                                    <div className={`card-header ${session.bgClass}`}><span className="tag">{session.category}</span><h3 className="card-title">{formatTextForUnit(cardTitle)}</h3></div>
                                                     <div className="card-body">
                                                         <span className={diffClass} style={{color: session.diffColor}}>{session.difficulty}</span>
                                                         <div className="card-divider"></div>
@@ -637,6 +655,13 @@ export default function The11thMile() {
             {/* INFO MODAL */}
             {infoModalSession && (() => {
                 const sData = infoModalSession;
+                const reducedWorkout = getReducedIntervalWorkout(sData, unit);
+                const displayedSession = isReducedSession && reducedWorkout
+                    ? { ...sData, ...reducedWorkout }
+                    : sData;
+                const modalTitle = isReducedSession && reducedWorkout && !reducedWorkout.hasReps
+                    ? 'No reps remain after removing tempo efforts'
+                    : getSessionDisplayTitle(displayedSession);
                 
                 const parsePaces = (text) => {
                     if(!text) return "";
@@ -649,6 +674,10 @@ export default function The11thMile() {
                             .replace(/\[THRESHOLD\]/g, `<span class='pace-highlight'>${formatTime(paces.threshold)}</span>`)
                             .replace(/\[INTERVAL\]/g, `<span class='pace-highlight'>${formatTime(paces.interval)}</span>`)
                             .replace(/\[FLOAT\]/g, `<span class='pace-highlight'>${formatTime(paces.float)}</span>`)
+                            .replace(/\[PACE_10K\]/g, `<span class='pace-highlight'>10k pace (${formatTime(paces.race10k)} /${unit === 'miles' ? 'mi' : 'km'})</span>`)
+                            .replace(/\[PACE_5K\]/g, `<span class='pace-highlight'>5k pace (${formatTime(paces.race5k)} /${unit === 'miles' ? 'mi' : 'km'})</span>`)
+                            .replace(/\[PACE_3K\]/g, `<span class='pace-highlight'>3k pace (${formatTime(paces.race3k)} /${unit === 'miles' ? 'mi' : 'km'})</span>`)
+                            .replace(/\[PACE_1500M\]/g, `<span class='pace-highlight'>1500m pace (${formatTime(paces.race1500)} /${unit === 'miles' ? 'mi' : 'km'})</span>`)
                             .replace(/\[MAX_EFFORT\]/g, `<span class='pace-highlight'>MAX EFFORT</span>`);
                     }
                     return t;
@@ -660,11 +689,13 @@ export default function The11thMile() {
                             <div className="modal-header">
                                 <div className="drag-handle"></div>
                                 <div className="close-btn" onClick={() => setInfoModalSession(null)}>&times;</div>
-                                <h2 style={{margin:'5px 0 0 0', color:'var(--primary)'}}>{formatTextForUnit(sData.title)}</h2>
+                                <h2 style={{margin:'5px 0 0 0', color:'var(--primary)'}}>{formatTextForUnit(modalTitle)}</h2>
                                 <div style={{fontSize:'0.85rem', color:'#636e72', marginTop:'5px', fontWeight:500}}>{sData.category}</div>
                             </div>
                             <div className="modal-body">
-                                
+                                {isReducedSession && reducedWorkout && !reducedWorkout.hasReps && (
+                                    <p className="reduced-session-note">This session contains only tempo efforts, so removing them leaves no reps to reduce.</p>
+                                )}
                                 {/* MISSING 5K TIME WARNING */}
                                 {!paces && (
                                     <div style={{background: '#fff3cd', color: '#d63031', padding: '15px', borderRadius: '8px', marginBottom: '20px', fontSize: '0.85rem', fontWeight: 'bold', border: '1px solid #ffeaa7', lineHeight: '1.4'}}>
@@ -672,29 +703,32 @@ export default function The11thMile() {
                                     </div>
                                 )}
 
-                                {sData.sessionDetail && (
+                                {displayedSession.sessionDetail && (
                                     <div style={{marginBottom: '20px'}}>
                                         <h4 style={{margin:'0 0 5px 0', textTransform:'uppercase', color:'#b2bec3', fontSize:'0.8rem'}}>Session</h4>
-                                        <div style={{fontWeight: '700', color: 'var(--primary)', fontSize: '1rem'}} dangerouslySetInnerHTML={{__html: parsePaces(sData.sessionDetail)}}></div>
+                                        <div style={{fontWeight: '700', color: 'var(--primary)', fontSize: '1rem'}} dangerouslySetInnerHTML={{__html: parsePaces(displayedSession.sessionDetail)}}></div>
                                     </div>
                                 )}
-                                {sData.recoveryDetail && (
+                                {isReducedSession && reducedWorkout?.hasReps && (
+                                    <p className="reduced-session-note">Reduced version: tempo efforts removed and each remaining rep shortened by 200m. Reps of 200m or less are removed. Recovery stays the same.</p>
+                                )}
+                                {displayedSession.recoveryDetail && (
                                     <div style={{marginBottom: '20px'}}>
                                         <h4 style={{margin:'0 0 5px 0', textTransform:'uppercase', color:'#b2bec3', fontSize:'0.8rem'}}>Recovery</h4>
-                                        <div style={{color: 'var(--text-dark)'}} dangerouslySetInnerHTML={{__html: parsePaces(sData.recoveryDetail)}}></div>
+                                        <div style={{color: 'var(--text-dark)'}} dangerouslySetInnerHTML={{__html: parsePaces(displayedSession.recoveryDetail)}}></div>
                                     </div>
                                 )}
-                                {sData.breakdown && (
+                                {displayedSession.breakdown && (
                                     <div style={{marginBottom: '20px'}}>
                                         <h4 style={{margin:'0 0 5px 0', textTransform:'uppercase', color:'#b2bec3', fontSize:'0.8rem'}}>Breakdown</h4>
-                                        <div style={{color: 'var(--text-dark)', lineHeight: '1.6'}} dangerouslySetInnerHTML={{__html: parsePaces(sData.breakdown)}}></div>
+                                        <div style={{color: 'var(--text-dark)', lineHeight: '1.6'}} dangerouslySetInnerHTML={{__html: parsePaces(displayedSession.breakdown)}}></div>
                                     </div>
                                 )}
-                                {sData.pacesList && sData.pacesList.length > 0 && (
+                                {displayedSession.pacesList && displayedSession.pacesList.length > 0 && (
                                     <div style={{marginBottom: '20px'}}>
                                         <h4 style={{margin:'0 0 5px 0', textTransform:'uppercase', color:'#b2bec3', fontSize:'0.8rem'}}>Pace</h4>
                                         <div style={{color: 'var(--text-dark)', lineHeight: '1.6'}}>
-                                            {sData.pacesList.map((p, idx) => (
+                                            {displayedSession.pacesList.map((p, idx) => (
                                                 <div key={idx} dangerouslySetInnerHTML={{__html: parsePaces(p)}}></div>
                                             ))}
                                         </div>
